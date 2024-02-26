@@ -12,14 +12,36 @@ the Bezier curve at the parameter $t$.
 
 We picked a Bezier curve of six points. Shown is a progression of the algorithm:
 
-- ![](images/task1-0.png)
-- ![](images/task1-1.png)
-- ![](images/task1-2.png)
-- ![](images/task1-3.png)
-- ![](images/task1-4.png)
-- ![](images/task1-5.png)
-- ![](images/task1-c.png)
+![](images/task1-0.png)
+
+![](images/task1-1.png)
+
+![](images/task1-2.png)
+
+![](images/task1-3.png)
+
+![](images/task1-4.png)
+
+![](images/task1-5.png)
+
+![](images/task1-c.png)
 
 Here's a slightly different curve evaluated at a different parameter:
 
-- ![](images/task1-other.png)
+![](images/task1-other.png)
+
+## Part 2
+
+Bezier surfaces are specified by a grid of N by M control points. The de
+Casteljau algorithm can be extended to evaluate not only Bezier curves, but
+Bezier surfaces as well. By applying the algorithm to each row, we obtain a new
+set of control points. We can then apply the algorithm to these new control
+points to obtain the value of the Bezier surface at the desired parameter. Turns
+out, the algorithm works the same whether we evaluate rows first or columns
+first.
+
+Here is a picture of the teapot being rendered:
+
+![](images/task2-empty.png)
+
+![](images/task2-filled.png)
