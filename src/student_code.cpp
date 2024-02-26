@@ -88,16 +88,15 @@ EdgeIter HalfedgeMesh::flipEdge(EdgeIter e0) {
   if (ha->isBoundary() || hb->isBoundary())
     return e0;
 
-  // Flip edge
+  // ha's triangle becomes ha -> hbNN -> haN
   ha->setNeighbors(hbNN, hb, haNN->vertex(), ha->edge(), ha->face());
-  hb->setNeighbors(haNN, ha, hbNN->vertex(), hb->edge(), hb->face());
-
-  // Update pointers for each halfedge
-  // h*N changes `next`, h**N changes `next` and `face`
-  haN->setNeighbors(ha, haN->twin(), haN->vertex(), haN->edge(), haN->face());
-  hbN->setNeighbors(hb, hbN->twin(), hbN->vertex(), hbN->edge(), hbN->face());
-  haNN->setNeighbors(hbN, haNN->twin(), haNN->vertex(), haNN->edge(), hb->face());
   hbNN->setNeighbors(haN, hbNN->twin(), hbNN->vertex(), hbNN->edge(), ha->face());
+  haN->setNeighbors(ha, haN->twin(), haN->vertex(), haN->edge(), ha->face());
+
+  // hb's triangle becomes hb -> haNN -> hbN
+  hb->setNeighbors(haNN, ha, hbNN->vertex(), hb->edge(), hb->face());
+  haNN->setNeighbors(hbN, haNN->twin(), haNN->vertex(), haNN->edge(), hb->face());
+  hbN->setNeighbors(hb, hbN->twin(), hbN->vertex(), hbN->edge(), hb->face());
 
   // Update pointers for each vertex, edge, and face
   ha->vertex()->halfedge() = ha->edge()->halfedge() = ha->face()->halfedge() = ha;
