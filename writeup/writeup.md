@@ -66,3 +66,39 @@ Here is a picture of the teapot without the normals used:
 And here is a picture of the teapot with the normals used:
 
 ![](images/task3-with.png)
+
+## Part 4
+
+Implementing the edge flip was a bit more challenging. At first, it seemed like
+it would be a lot of work to keep track of all the pointers and make sure
+everything was consistent. However, after rethinking about the problem in terms
+of "what are the new triangles", we settled on the following:
+
+![](images/task4-diagram.jpg)
+
+For a given edge `ha` and its twin `hb` shown above (edges labeled at their
+starting vertex), if we shorten `->next()` to `.N`, the new triangles should be
+the following:
+
+- `ha` → `hb.NN` → `ha.N`
+- `hb` → `ha.NN` → `hb.N`
+
+We can set the `next` and `face` pointers accordingly. Furthermore, the vertex
+of `ha` should be updated to that of `ha.N.N` and the vertex of `hb` should be
+updated to that of `hb.N.N`.
+
+Lastly, we had to make sure that all the pointers pointing back to each halfedge
+were updated as well. This was a bit tricky to approach at first, but we avoided
+having to think too hard about exactly what changed by simply updating every
+single pointer.
+
+Here's some screenshots of edge flips!
+
+![](images/task4-0.png)
+
+![](images/task4-1.png)
+
+![](images/task4-2.png)
+
+With careful planning, a potentially frustrating debugging journey was
+thankfully avoided 🙂
