@@ -396,6 +396,8 @@ namespace CGL
             return _isBoundary;
          }
 
+         double area( void ) const;
+
          /**
           * Get a unit face normal (computed via the area vector).
           * \returns a unit face normal (computed via the area vector).

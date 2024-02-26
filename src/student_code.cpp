@@ -63,12 +63,21 @@ Vector3D BezierPatch::evaluate(double u, double v) const {
   return evaluate1D(rows, u);
 }
 
+double Face::area(void) const {
+  Vector3D a = halfedge()->vertex()->position;
+  Vector3D b = halfedge()->next()->vertex()->position;
+  Vector3D c = halfedge()->next()->next()->vertex()->position;
+  return cross(b - a, c - a).norm() / 2;
+}
+
 Vector3D Vertex::normal(void) const {
-  // TODO Part 3.
-  // Returns an approximate unit normal at this vertex, computed by
-  // taking the area-weighted average of the normals of neighboring
-  // triangles, then normalizing.
-  return Vector3D();
+  Vector3D avg;
+  HalfedgeCIter h = halfedge();
+  do {
+    avg += h->face()->normal() * h->face()->area();
+    h = h->twin()->next();
+  } while (h != halfedge());
+  return avg.unit();
 }
 
 EdgeIter HalfedgeMesh::flipEdge(EdgeIter e0) {
