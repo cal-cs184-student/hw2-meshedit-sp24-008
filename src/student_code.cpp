@@ -1,4 +1,5 @@
 #include "student_code.h"
+#include "halfEdgeMesh.h"
 #include "mutablePriorityQueue.h"
 
 using namespace std;
@@ -81,9 +82,32 @@ Vector3D Vertex::normal(void) const {
 }
 
 EdgeIter HalfedgeMesh::flipEdge(EdgeIter e0) {
-  // TODO Part 4.
-  // This method should flip the given edge and return an iterator to the flipped edge.
-  return EdgeIter();
+  HalfedgeIter ha = e0->halfedge(), haN = ha->next(), haNN = haN->next();
+  HalfedgeIter hb = ha->twin(), hbN = hb->next(), hbNN = hbN->next();
+
+  if (ha->isBoundary() || hb->isBoundary())
+    return e0;
+
+  // Flip edge
+  ha->setNeighbors(hbNN, hb, haNN->vertex(), ha->edge(), ha->face());
+  hb->setNeighbors(haNN, ha, hbNN->vertex(), hb->edge(), hb->face());
+
+  // Update pointers for each halfedge
+  // h*N changes `next`, h**N changes `next` and `face`
+  haN->setNeighbors(ha, haN->twin(), haN->vertex(), haN->edge(), haN->face());
+  hbN->setNeighbors(hb, hbN->twin(), hbN->vertex(), hbN->edge(), hbN->face());
+  haNN->setNeighbors(hbN, haNN->twin(), haNN->vertex(), haNN->edge(), hb->face());
+  hbNN->setNeighbors(haN, hbNN->twin(), hbNN->vertex(), hbNN->edge(), ha->face());
+
+  // Update pointers for each vertex, edge, and face
+  ha->vertex()->halfedge() = ha->edge()->halfedge() = ha->face()->halfedge() = ha;
+  hb->vertex()->halfedge() = hb->edge()->halfedge() = hb->face()->halfedge() = hb;
+  haN->vertex()->halfedge() = haN->edge()->halfedge() = haN->face()->halfedge() = haN;
+  hbN->vertex()->halfedge() = hbN->edge()->halfedge() = hbN->face()->halfedge() = hbN;
+  haNN->vertex()->halfedge() = haNN->edge()->halfedge() = haNN->face()->halfedge() = haNN;
+  hbNN->vertex()->halfedge() = hbNN->edge()->halfedge() = hbNN->face()->halfedge() = hbNN;
+
+  return e0;
 }
 
 VertexIter HalfedgeMesh::splitEdge(EdgeIter e0) {
