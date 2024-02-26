@@ -45,3 +45,24 @@ Here is a picture of the teapot being rendered:
 ![](images/task2-empty.png)
 
 ![](images/task2-filled.png)
+
+## Part 3
+
+Implementing the area-weighted vertex normals was fairly straightforward, since
+`Face::normal()` was already provided to us. The most complex thing we had to do
+was to figure out how to compute the area of a triangle. We used the formula
+$A = \frac{\lVert \mathbf{AB} \times \mathbf{AC} \rVert}{2}$, which we
+implemented in C++ using the provided `cross` and `norm` utilities.
+
+From there, we iterated through each edge connected to the vertex by repeatedly
+taking `twin()->next()`, multiplying the result of our area utility function as
+well as the provided `Face::normal()` function, and summing the results. We then
+normalized the sum and returned it.
+
+Here is a picture of the teapot without the normals used:
+
+![](images/task3-without.png)
+
+And here is a picture of the teapot with the normals used:
+
+![](images/task3-with.png)
