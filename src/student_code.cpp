@@ -138,10 +138,12 @@ VertexIter HalfedgeMesh::splitEdge(EdgeIter e0) {
   hc->setNeighbors(hcN, haNN, ha->vertex(), haNN->edge(), newFace());
   hcN->setNeighbors(hcNN, haNN->twin(), haNN->vertex(), newEdge(), hc->face());
   hcNN->setNeighbors(hc, hb, hbN->vertex(), hb->edge(), hc->face());
+  swap(hc->edge(), hcN->edge());
 
   // Update pointers for each vertex, edge, and face
   UPDATE_POINTERS_3(ha, haN, haNN);
   UPDATE_POINTERS_3(hc, hcN, hcNN);
+  haNN->edge()->isNew = true;
 
   if (hb->isBoundary()) {
     // Boundary. Only one new edge to twin ha
@@ -165,10 +167,12 @@ VertexIter HalfedgeMesh::splitEdge(EdgeIter e0) {
   hd->setNeighbors(hdN, hbNN, hb->vertex(), hbNN->edge(), newFace());
   hdN->setNeighbors(hdNN, hbNN->twin(), hbNN->vertex(), newEdge(), hd->face());
   hdNN->setNeighbors(hd, ha, haN->vertex(), ha->edge(), hd->face());
+  swap(hd->edge(), hdN->edge());
 
   // Update pointers for each vertex, edge, and face
   UPDATE_POINTERS_3(hb, hbN, hbNN);
   UPDATE_POINTERS_3(hd, hdN, hdNN);
+  hbNN->edge()->isNew = true;
 
   return ha->vertex();
 }
@@ -193,7 +197,7 @@ void MeshResampler::upsample(HalfedgeMesh &mesh) {
       h = h->twin()->next();
     } while (h != v->halfedge());
 
-    float u = (n == 3) ? 3.0f / 16.0f : 3.0f / (8 * n);
+    double u = (n == 3) ? 3.0 / 16.0 : 3.0 / (8 * n);
     v->newPosition = (1 - n * u) * v->position + u * neighborSum;
     v->isNew = false;
   }
@@ -207,7 +211,7 @@ void MeshResampler::upsample(HalfedgeMesh &mesh) {
     Vector3D B = h->twin()->vertex()->position;
     Vector3D C = h->next()->next()->vertex()->position;
     Vector3D D = h->twin()->next()->next()->vertex()->position;
-    e->newPosition = 3.0/8.0 * (A + B) + 1.0/8.0 * (C + D);
+    e->newPosition = 3.0 / 8.0 * (A + B) + 1.0 / 8.0 * (C + D);
   }
 
   // 3. Split every edge in the mesh, in any order. For future reference, we're also
@@ -217,29 +221,19 @@ void MeshResampler::upsample(HalfedgeMesh &mesh) {
   // original mesh---otherwise, we'll end up splitting edges that we just split (and the
   // loop will never end!)
 
-  cout << "step 3: split edges" << endl;
   std::vector<EdgeIter> originalEdges;
-  for (EdgeIter e = mesh.edgesBegin(); e != mesh.edgesEnd(); ++e) {
-    if (!e->isNew) {
-      originalEdges.push_back(e);
-    }
+  for (EdgeIter e = mesh.edgesBegin(); e != mesh.edgesEnd(); e++) {
+    originalEdges.push_back(e);
+    e->isNew = false;
   }
 
   for (EdgeIter e : originalEdges) {
-    Vector3D newPos = e->newPosition;
     VertexIter newV = mesh.splitEdge(e);
-    newV->newPosition = newPos;
+    newV->newPosition = e->newPosition;
     newV->isNew = true;
-
-    HalfedgeIter h = newV->halfedge();
-    do {
-      h->edge()->isNew = true;
-      h = h->twin()->next();
-    } while (h != newV->halfedge());
   }
 
   // 4. Flip any new edge that connects an old and new vertex.
-  cout << "step 4: flip edges" << endl;
   for (EdgeIter e = mesh.edgesBegin(); e != mesh.edgesEnd(); ++e) {
     if (e->isNew) {
       HalfedgeIter h = e->halfedge();
@@ -250,7 +244,6 @@ void MeshResampler::upsample(HalfedgeMesh &mesh) {
       }
     }
   }
-  cout << "step 4: done" << endl;
 
   // 5. Copy the new vertex positions into final Vertex::position.
   for (VertexIter v = mesh.verticesBegin(); v != mesh.verticesEnd(); ++v) {
