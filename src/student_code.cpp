@@ -182,8 +182,33 @@ void MeshResampler::upsample(HalfedgeMesh &mesh) {
   // subdivision rule, and store them in Vertex::newPosition. At this point, we also
   // want to mark each vertex as being a vertex of the original mesh.
 
+  // update old vertices
+  for (VertexIter v = mesh.verticesBegin(); v != mesh.verticesEnd(); ++v) {
+    Vector3D neighborSum(0, 0, 0);
+    int n = 0;
+    HalfedgeCIter h = v->halfedge();
+    do {
+      n++;
+      neighborSum += h->twin()->vertex()->position;
+      h = h->twin()->next();
+    } while (h != v->halfedge());
+
+    float u = (n == 3) ? 3.0f / 16.0f : 3.0f / (8 * n);
+    v->newPosition = (1 - n * u) * v->position + u * neighborSum;
+    v->isNew = false;
+  }
+
   // 2. Compute the updated vertex positions associated with edges, and store it in
   // Edge::newPosition.
+
+  for (EdgeIter e = mesh.edgesBegin(); e != mesh.edgesEnd(); ++e) {
+    HalfedgeIter h = e->halfedge();
+    Vector3D A = h->vertex()->position;
+    Vector3D B = h->twin()->vertex()->position;
+    Vector3D C = h->next()->next()->vertex()->position;
+    Vector3D D = h->twin()->next()->next()->vertex()->position;
+    e->newPosition = 3.0/8.0 * (A + B) + 1.0/8.0 * (C + D);
+  }
 
   // 3. Split every edge in the mesh, in any order. For future reference, we're also
   // going to store some information about which subdivide edges come from splitting an
@@ -192,8 +217,44 @@ void MeshResampler::upsample(HalfedgeMesh &mesh) {
   // original mesh---otherwise, we'll end up splitting edges that we just split (and the
   // loop will never end!)
 
+  cout << "step 3: split edges" << endl;
+  std::vector<EdgeIter> originalEdges;
+  for (EdgeIter e = mesh.edgesBegin(); e != mesh.edgesEnd(); ++e) {
+    if (!e->isNew) {
+      originalEdges.push_back(e);
+    }
+  }
+
+  for (EdgeIter e : originalEdges) {
+    Vector3D newPos = e->newPosition;
+    VertexIter newV = mesh.splitEdge(e);
+    newV->newPosition = newPos;
+    newV->isNew = true;
+
+    HalfedgeIter h = newV->halfedge();
+    do {
+      h->edge()->isNew = true;
+      h = h->twin()->next();
+    } while (h != newV->halfedge());
+  }
+
   // 4. Flip any new edge that connects an old and new vertex.
+  cout << "step 4: flip edges" << endl;
+  for (EdgeIter e = mesh.edgesBegin(); e != mesh.edgesEnd(); ++e) {
+    if (e->isNew) {
+      HalfedgeIter h = e->halfedge();
+      bool v0isNew = h->vertex()->isNew;
+      bool v1isNew = h->twin()->vertex()->isNew;
+      if (v0isNew != v1isNew) {
+        mesh.flipEdge(e);
+      }
+    }
+  }
+  cout << "step 4: done" << endl;
 
   // 5. Copy the new vertex positions into final Vertex::position.
+  for (VertexIter v = mesh.verticesBegin(); v != mesh.verticesEnd(); ++v) {
+    v->position = v->newPosition;
+  }
 }
 } // namespace CGL
