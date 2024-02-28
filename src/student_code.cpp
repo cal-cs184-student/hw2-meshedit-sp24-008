@@ -85,7 +85,8 @@ Vector3D Vertex::normal(void) const {
   h->vertex()->halfedge() = h;                                                             \
   h->edge()->halfedge() = h;                                                               \
   h->face()->halfedge() = h;                                                               \
-  h->twin()->twin() = h;
+  h->twin()->twin() = h;                                                                   \
+  h->twin()->edge() = h->edge();
 
 #define UPDATE_POINTERS_3(h1, h2, h3)                                                      \
   UPDATE_POINTERS(h1);                                                                     \
@@ -120,8 +121,10 @@ VertexIter HalfedgeMesh::splitEdge(EdgeIter e0) {
   HalfedgeIter ha = e0->halfedge(), haN = ha->next(), haNN = haN->next();
   HalfedgeIter hb = ha->twin(), hbN = hb->next(), hbNN = hbN->next();
 
-  if (ha->isBoundary() || hb->isBoundary())
+  if (ha->isBoundary() && hb->isBoundary())
     return ha->vertex();
+  if (ha->isBoundary())
+    swap(ha, hb);
 
   // Average the positions of the two vertices
   VertexIter mid = newVertex();
@@ -129,30 +132,42 @@ VertexIter HalfedgeMesh::splitEdge(EdgeIter e0) {
   ha->vertex() = hb->vertex() = mid;
   ha->edge() = newEdge();
 
-  // Create new triangles
+  // New triangle on ha's face
+  // hc (haNN) -> hcN -> hcNN (hb)
   HalfedgeIter hc = newHalfedge(), hcN = newHalfedge(), hcNN = newHalfedge();
-  HalfedgeIter hd = newHalfedge(), hdN = newHalfedge(), hdNN = newHalfedge();
-
-  // new triangle 1 is hc (haNN) -> hcN -> hcNN (hb)
-  hc->face() = newFace();
-  hc->setNeighbors(hcN, haNN, ha->vertex(), haNN->edge(), hc->face());
+  hc->setNeighbors(hcN, haNN, ha->vertex(), haNN->edge(), newFace());
   hcN->setNeighbors(hcNN, haNN->twin(), haNN->vertex(), newEdge(), hc->face());
   hcNN->setNeighbors(hc, hb, hbN->vertex(), hb->edge(), hc->face());
-  hcN->twin()->edge() = hcN->edge();
-
-  // new triangle 2 is hd (hbNN) -> hdN -> hdNN (ha)
-  hd->face() = newFace();
-  hd->setNeighbors(hdN, hbNN, hb->vertex(), hbNN->edge(), hd->face());
-  hdN->setNeighbors(hdNN, hbNN->twin(), hbNN->vertex(), newEdge(), hd->face());
-  hdNN->setNeighbors(hd, ha, haN->vertex(), ha->edge(), hd->face());
-  hdN->twin()->edge() = hdN->edge();
-
-  // hcN takes the place of haNN and hdN takes the place of hbNN
 
   // Update pointers for each vertex, edge, and face
   UPDATE_POINTERS_3(ha, haN, haNN);
-  UPDATE_POINTERS_3(hb, hbN, hbNN);
   UPDATE_POINTERS_3(hc, hcN, hcNN);
+
+  if (hb->isBoundary()) {
+    // Boundary. Only one new edge to twin ha
+    HalfedgeIter hdNN = newHalfedge();
+    hdNN->setNeighbors(hb, ha, haN->vertex(), ha->edge(), hb->face());
+    ha->twin() = hdNN;
+
+    // Update previous halfedge's next pointer
+    HalfedgeIter h = hb;
+    while (h->next() != hb)
+      h = h->next();
+    h->next() = hdNN;
+
+    UPDATE_POINTERS(hdNN)
+    return ha->vertex();
+  }
+
+  // New triangle on hb's face
+  // hd (hbNN) -> hdN -> hdNN (ha)
+  HalfedgeIter hd = newHalfedge(), hdN = newHalfedge(), hdNN = newHalfedge();
+  hd->setNeighbors(hdN, hbNN, hb->vertex(), hbNN->edge(), newFace());
+  hdN->setNeighbors(hdNN, hbNN->twin(), hbNN->vertex(), newEdge(), hd->face());
+  hdNN->setNeighbors(hd, ha, haN->vertex(), ha->edge(), hd->face());
+
+  // Update pointers for each vertex, edge, and face
+  UPDATE_POINTERS_3(hb, hbN, hbNN);
   UPDATE_POINTERS_3(hd, hdN, hdNN);
 
   return ha->vertex();
