@@ -99,7 +99,7 @@ endif(APPLE)
 #-------------------------------------------------------------------------------
 if(APPLE)
   set_property( TARGET meshedit APPEND_STRING PROPERTY COMPILE_FLAGS
-                "-Wno-deprecated-declarations -Wno-c++11-extensions")
+                "-Wno-deprecated-declarations -Wno-c++17-extensions")
 endif(APPLE)
 
 
