@@ -12,9 +12,8 @@ the Bezier curve at the parameter $t$.
 
 We picked a Bezier curve of six points. Shown is a progression of the algorithm:
 
-
-| a | b | c |
-| --- | ------------------- | ------------------- |
+| a                       | b                       | c                       |
+| ----------------------- | ----------------------- | ----------------------- |
 | ![](images/task1-0.png) | ![](images/task1-1.png) | ![](images/task1-2.png) |
 | ![](images/task1-3.png) | ![](images/task1-4.png) | ![](images/task1-5.png) |
 
@@ -88,8 +87,8 @@ single pointer.
 
 Here's some screenshots of edge flips!
 
-| 0 | 1 | 2 |
-| --- | --- | --- |
+| 0                       | 1                       | 2                       |
+| ----------------------- | ----------------------- | ----------------------- |
 | ![](images/task4-0.png) | ![](images/task4-1.png) | ![](images/task4-2.png) |
 
 With careful planning, a potentially frustrating debugging journey was
@@ -98,52 +97,53 @@ thankfully avoided 🙂
 ## Part 5
 
 Once again, by drawing out a diagram and breaking down the steps beforehand,
-implementing edge split was fairly straightforward.
-We call the halfedges associated with the edge to be split `ha` and `hb`. A new vertex is
-created at the midpoint of the edge being split, and the vertices and new faces created by this
-operation are assigned.
+implementing edge split was fairly straightforward. We call the halfedges
+associated with the edge to be split `ha` and `hb`. A new vertex is created at
+the midpoint of the edge being split, and the vertices and new faces created by
+this operation are assigned.
 
-EC: We also implemented edge split for boundary edges.
-If both half-edges of the edge are boundary edges, then there is no splitting to be done.
-In the case that one of `ha` or `hb` is a boundary, then we add a new vertex and create only
-one new triangle face instead of two additional faces from having vertices on either side.
+EC: We also implemented edge split for boundary edges. If both half-edges of the
+edge are boundary edges, then there is no splitting to be done. In the case that
+one of `ha` or `hb` is a boundary, then we add a new vertex and create only one
+new triangle face instead of two additional faces from having vertices on either
+side.
 
-|      | Before split | After split | 
-| ---- | ------------------- | ------------------- |
-| Sketch | ![](images/task5-before-sketch.png) | ![](images/task5-after-sketch.png) | 
-| Simple mesh| ![](images/task5-before.png) | ![](images/task5-after.png) | 
-| Splits and flips | ![](images/task5-split-flip-before.png) | ![](images/task5-split-flip-after.png) | 
-| EC: Boundary split | ![](images/task5-ec-before.png) | ![](images/task5-ec-after.png) | 
-
+|                    | Before split                            | After split                            |
+| ------------------ | --------------------------------------- | -------------------------------------- |
+| Sketch             | ![](images/task5-before-sketch.png)     | ![](images/task5-after-sketch.png)     |
+| Simple mesh        | ![](images/task5-before.png)            | ![](images/task5-after.png)            |
+| Splits and flips   | ![](images/task5-split-flip-before.png) | ![](images/task5-split-flip-after.png) |
+| EC: Boundary split | ![](images/task5-ec-before.png)         | ![](images/task5-ec-after.png)         |
 
 ## Part 6
 
 We followed the suggested steps of first computing all the new positions for
 vertices and edges and storing them in the `newPosition` variable. Next to split
 the edges, we create reference to all the original edges to ensure we don't loop
-indefinitely, and `splitEdge()` these edges. We had to modify `splitEdge()` slightly
-since the original implementation was correct but inconsistent since it moved the
-original edges, so we had to swap the original edges back to their positions.
-This was a tricky one to debug but we were able to observe what was happening by
-viewing the teapot mesh which has more regular/flat edges to begin with.
-Then, we flip the edges connecting an old and new vertex, and finally copy the
-vertices' stored `newPosition`s into `position`
+indefinitely, and `splitEdge()` these edges. We had to modify `splitEdge()`
+slightly since the original implementation was correct but inconsistent since it
+moved the original edges, so we had to swap the original edges back to their
+positions. This was a tricky one to debug but we were able to observe what was
+happening by viewing the teapot mesh which has more regular/flat edges to begin
+with. Then, we flip the edges connecting an old and new vertex, and finally copy
+the vertices' stored `newPosition`s into `position`
 
-The loop subdivision on its own can still result in some "sharp" corners if the original mesh had
-a sharp corner or vertices with a high index. The provided `cube.dae` for example does not have
-regular vertex degrees, resulting in a slightly pointy pillow-like cuboid (left).
-If we first manually preprocess the cube and regularize vertex degrees by flipping edges, then
-we can obtain a rounder shape.
+The loop subdivision on its own can still result in some "sharp" corners if the
+original mesh had a sharp corner or vertices with a high index. The provided
+`cube.dae` for example does not have regular vertex degrees, resulting in a
+slightly pointy pillow-like cuboid (left). If we first manually preprocess the
+cube and regularize vertex degrees by flipping edges, then we can obtain a
+rounder shape.
 
-EC: We also implemented boundary checks such that boundary edges are preserved and not moved or smoothed.
-See beetle below. Boundary vertices do not move, and boundary edges are split in the middle instead of using
-the Loop formula.
+EC: We also implemented boundary checks such that boundary edges are preserved
+and not moved or smoothed. See beetle below. Boundary vertices do not move, and
+boundary edges are split in the middle instead of using the Loop formula.
 
-| Cube | Preprocessed cube | Beetle boundary case|
-| --- | ------------------- | ------------------- |
+| Cube                          | Preprocessed cube          | Beetle boundary case          |
+| ----------------------------- | -------------------------- | ----------------------------- |
 | ![](images/task6-pillow1.png) | ![](images/task6-reg1.png) | ![](images/task6-beetle1.png) |
 | ![](images/task6-pillow2.png) | ![](images/task6-reg2.png) | ![](images/task6-beetle2.png) |
 | ![](images/task6-pillow3.png) | ![](images/task6-reg3.png) | ![](images/task6-beetle3.png) |
 | ![](images/task6-pillow4.png) | ![](images/task6-reg4.png) | ![](images/task6-beetle4.png) |
-| ![](images/task6-pillow5.png) | ![](images/task6-reg5.png) | |
-| ![](images/task6-pillow6.png) | ![](images/task6-reg6.png) | |
+| ![](images/task6-pillow5.png) | ![](images/task6-reg5.png) |                               |
+| ![](images/task6-pillow6.png) | ![](images/task6-reg6.png) |                               |
