@@ -6,19 +6,18 @@
 
 #include "CGL/CGL.h"
 
-#include "scene.h"
 #include "camera.h"
-#include "light.h"
-#include "mesh.h"
-#include "material.h"
 #include "halfEdgeMesh.h"
+#include "light.h"
+#include "material.h"
+#include "mesh.h"
+#include "scene.h"
 #include "student_code.h"
 
-#include <string>
+#include <algorithm>
 #include <iostream>
 #include <sstream>
-#include <algorithm>
-
+#include <string>
 
 using namespace std;
 
@@ -61,170 +60,151 @@ using namespace std;
 
 namespace CGL {
 
-  // This structure is used to store a color pallete for this application.
-  struct DrawStyle
+// This structure is used to store a color pallete for this application.
+struct DrawStyle {
+  Color halfedgeColor;
+  Color vertexColor;
+  Color edgeColor;
+  Color faceColor;
+
+  float strokeWidth;
+  float vertexRadius;
+};
+
+class MeshNode;
+
+// A MeshFeature is used to represent an element of the surface selected
+// by the user (e.g., edge, vertex, face).  No matter what kind of feature
+// is selected, the feature is specified relative to some polygon in the
+// mesh.  For instance, if an edge is selected, the MeshFeature will store
+// a pointer to a face containing that edge, as well as the local index of
+// the first (of two) vertices in the polygon corresponding to the edge.
+class MeshFeature {
+public:
+  // By default, a mesh feature points nowhere!
+  MeshFeature(void) : element(NULL), node(NULL), w(0.) {}
+
+  bool isValid(void) const
+  // Returns true if and only if this feature points
+  // to some valid element of some valid mesh.
   {
-     Color halfedgeColor;
-     Color vertexColor;
-     Color edgeColor;
-     Color faceColor;
+    return element != NULL && node != NULL;
+  }
 
-     float strokeWidth;
-     float vertexRadius;
-  };
-
-  class MeshNode;
-
-  // A MeshFeature is used to represent an element of the surface selected
-  // by the user (e.g., edge, vertex, face).  No matter what kind of feature
-  // is selected, the feature is specified relative to some polygon in the
-  // mesh.  For instance, if an edge is selected, the MeshFeature will store
-  // a pointer to a face containing that edge, as well as the local index of
-  // the first (of two) vertices in the polygon corresponding to the edge.
-  class MeshFeature
+  void invalidate(void)
+  // Marks this feature as not pointing to anything.
   {
-     public:
-        // By default, a mesh feature points nowhere!
-        MeshFeature( void )
-        : element( NULL ), node( NULL ), w( 0. )
-        {}
+    element = NULL;
+    node = NULL;
+  }
 
-        bool isValid( void ) const
-        // Returns true if and only if this feature points
-        // to some valid element of some valid mesh.
-        {
-           return element != NULL &&
-                     node != NULL;
-        }
+  HalfedgeElement *element; // which element is selected?
+  MeshNode *node;           // which mesh node does this element come from?
+  double w;                 // what's the depth value for this selection?
+};
 
-        void invalidate( void )
-        // Marks this feature as not pointing to anything.
-        {
-           element = NULL;
-              node = NULL;
-        }
+/* MeshNode class, for use with the MeshEdit class.
+ * Intended for Assignment 2 of 15-462 at Carnegie Mellon University.
+ *
+ * Written by Bryce Summers on 9/14/2015.
+ *
+ * Computes useful stuff for meshes and renders them to the screen.
+ * Also provides functionality for applying visual styles to the mesh
+ * that match up with the MeshEdit picking system.
+ */
+class MeshNode {
+public:
+  // Constructor.
+  MeshNode(Polymesh &polyMesh) {
 
-        HalfedgeElement* element; // which element is selected?
-        MeshNode* node; // which mesh node does this element come from?
-        double w; // what's the depth value for this selection?
-  };
+    // Construct a new array of index lists for the halfedgemesh structure.
+    vector<vector<size_t>> polygons;
 
+    // Currently, the halfedge data structure only stores the connectivity of
+    // the mesh and the vertex positions; here we just want to copy the
+    // connectivity into our local array ("polygons").
+    for (PolyListIter p = polyMesh.polygons.begin(); p != polyMesh.polygons.end(); p++) {
+      polygons.push_back(p->vertex_indices);
+    }
 
-  /* MeshNode class, for use with the MeshEdit class.
-   * Intended for Assignment 2 of 15-462 at Carnegie Mellon University.
-   *
-   * Written by Bryce Summers on 9/14/2015.
-   *
-   * Computes useful stuff for meshes and renders them to the screen.
-   * Also provides functionality for applying visual styles to the mesh
-   * that match up with the MeshEdit picking system.
+    mesh.build(polygons, polyMesh.vertices);
+  }
+
+  // Destructor --- this destructor shouldn't be needed according to the
+  // C++ spec, though some compilers seem to complain if there isn't a
+  // default destructor explicitly defined.  (May be worth checking up on
+  // later!)
+  ~MeshNode() {}
+
+  /* Returns the lower and upper corners of the axis aligned
+   * bounding box for the mesh
    */
-   class MeshNode
-   {
-      public:
-         // Constructor.
-         MeshNode( Polymesh& polyMesh )
-         {
+  void getBounds(Vector3D &low, Vector3D &high);
 
-            // Construct a new array of index lists for the halfedgemesh structure.
-            vector< vector<size_t> > polygons;
+  // Centroid / weighted average point.
+  void getCentroid(Vector3D &centroid);
 
-            // Currently, the halfedge data structure only stores the connectivity of
-            // the mesh and the vertex positions; here we just want to copy the
-            // connectivity into our local array ("polygons").
-            for( PolyListIter p  = polyMesh.polygons.begin();
-                              p != polyMesh.polygons.end();
-                              p ++ )
-            {
-               polygons.push_back( p->vertex_indices );
-            }
+  /* The following functions will be used for extracting model
+   * space triangluar data.
+   * These functions assume that all polygons are triangles.
+   * If a polygon has more than 3 vertices,
+   * only the first three vertices will be used.
+   * FIXME : Triangulate degenerate n > 3 gons.
+   */
 
-            mesh.build( polygons, polyMesh.vertices );
-         }
+  /*
+   * populates the given feature structure with data corresponding to
+   * mesh feature on the face corresponding to the given lookup structure
+   * and bary_centric_coordinates.
+   * OUT : feature.
+   */
+  void fillFeatureStructure(MeshFeature &lookup, MeshFeature &feature,
+                            Vector3D &barycentric_coords, float w);
 
-         // Destructor --- this destructor shouldn't be needed according to the
-         // C++ spec, though some compilers seem to complain if there isn't a
-         // default destructor explicitly defined.  (May be worth checking up on
-         // later!)
-         ~MeshNode() {}
+  // representation of the mesh geometry itself
+  HalfedgeMesh mesh;
 
+  // This vector gives us indexed hooks into the half edge structure,
+  // which can be used to query information for the debugging messages.
+  std::vector<Vertex *> half_edge_vertices;
 
-         /* Returns the lower and upper corners of the axis aligned
-          * bounding box for the mesh
-          */
-         void getBounds( Vector3D& low, Vector3D& high );
+private:
+  // These thresholds define when a mouse click on given
+  // triangle corresponds to selection of a vertex, edge,
+  // or face; they are expressed as percent relative to
+  // barycentric coordinates. (Note that .3 is about halfway
+  // through the triangle.)
+  const double low_threshold = .1;
+  const double mid_threshold = .2;
+  const double high_threshold = 1.0 - low_threshold;
 
-         // Centroid / weighted average point.
-         void getCentroid( Vector3D& centroid );
-
-
-         /* The following functions will be used for extracting model
-          * space triangluar data.
-          * These functions assume that all polygons are triangles.
-          * If a polygon has more than 3 vertices,
-          * only the first three vertices will be used.
-          * FIXME : Triangulate degenerate n > 3 gons.
-          */
-
-         /*
-          * populates the given feature structure with data corresponding to
-          * mesh feature on the face corresponding to the given lookup structure
-          * and bary_centric_coordinates.
-          * OUT : feature.
-          */
-         void fillFeatureStructure(MeshFeature & lookup,
-                                   MeshFeature & feature,
-                                   Vector3D    & barycentric_coords,
-                                   float w);
-
-
-         // representation of the mesh geometry itself
-         HalfedgeMesh mesh;
-
-         // This vector gives us indexed hooks into the half edge structure,
-         // which can be used to query information for the debugging messages.
-         std::vector<Vertex*> half_edge_vertices;
-
-      private:
-         // These thresholds define when a mouse click on given
-         // triangle corresponds to selection of a vertex, edge,
-         // or face; they are expressed as percent relative to
-         // barycentric coordinates. (Note that .3 is about halfway
-         // through the triangle.)
-         const double low_threshold  = .1;
-         const double mid_threshold  = .2;
-         const double high_threshold = 1.0 - low_threshold;
-
-   };// class MeshNode.
-
+}; // class MeshNode.
 
 // The viewer class the manages the viewing and rendering of Collada Files.
 class MeshEdit : public Renderer {
- public:
-
+public:
   // --  Inherited public interface functions.
-  ~MeshEdit() { }
+  ~MeshEdit() {}
 
   virtual void init();
   virtual void render();
-  virtual void resize( size_t w, size_t h);
+  virtual void resize(size_t w, size_t h);
 
   virtual std::string name();
   virtual std::string info();
 
-  virtual void key_event( char key );
-  virtual void cursor_event( float x, float y, unsigned char keys );
-  virtual void scroll_event( float offset_x, float offset_y );
-  virtual void mouse_button_event( int button, int event );
+  virtual void key_event(char key);
+  virtual void cursor_event(float x, float y, unsigned char keys);
+  virtual void scroll_event(float offset_x, float offset_y);
+  virtual void mouse_button_event(int button, int event);
 
-  void load( Scene* scene );
+  void load(Scene *scene);
 
- private:
-
-  void initializeStyle( void );
+private:
+  void initializeStyle(void);
 
   // --  Private Variables.
-  Scene* scene;
+  Scene *scene;
 
   vector<MeshNode> meshNodes;
 
@@ -246,7 +226,7 @@ class MeshEdit : public Renderer {
   // Specify the location of eye and what it is pointing at.
   Vector3D view_focus;
 
-  enum e_up{X_UP, Y_UP, Z_UP};
+  enum e_up { X_UP, Y_UP, Z_UP };
   e_up up;
   Vector3D camera_angles;
 
@@ -262,14 +242,13 @@ class MeshEdit : public Renderer {
 
   int light_num;
 
-
   // -- Helper functions.
 
   // Initialization functions to get the opengl cooking with oil.
-  void init_camera   (Camera& camera     );
-  void init_light    (Light& light       );
-  void init_polymesh (Polymesh& polymesh );
-  void init_material (Material& material );
+  void init_camera(Camera &camera);
+  void init_light(Light &light);
+  void init_polymesh(Polymesh &polymesh);
+  void init_material(Material &material);
 
   // Control functions.
   void update_camera();
@@ -279,17 +258,17 @@ class MeshEdit : public Renderer {
   void reset_camera();
 
   // Rendering functions.
-  void renderMesh   ( HalfedgeMesh& mesh );
-  void drawFaces    ( HalfedgeMesh& mesh );
-  void drawEdges    ( HalfedgeMesh& mesh );
-  void drawVertices ( HalfedgeMesh& mesh );
-  void drawHalfedges( HalfedgeMesh& mesh );
-  void drawHalfedgeArrow( Halfedge* h );
+  void renderMesh(HalfedgeMesh &mesh);
+  void drawFaces(HalfedgeMesh &mesh);
+  void drawEdges(HalfedgeMesh &mesh);
+  void drawVertices(HalfedgeMesh &mesh);
+  void drawHalfedges(HalfedgeMesh &mesh);
+  void drawHalfedgeArrow(Halfedge *h);
 
   // Sets the draw style (colors, edge widths, etc.) for the specified
   // mesh element according to whether it is hovered or selected, using
   // the styles below.
-  void setElementStyle( HalfedgeElement* element );
+  void setElementStyle(HalfedgeElement *element);
 
   /*
    * A pleasing Brycian, Kavonian, Keenian, Skyian,
@@ -305,10 +284,9 @@ class MeshEdit : public Renderer {
   bool mouse_rotate;
   float mouse_x, mouse_y;
 
-  enum e_mouse_button
-  {
-    LEFT   = MOUSE_BUTTON_LEFT,
-    RIGHT  = MOUSE_BUTTON_RIGHT,
+  enum e_mouse_button {
+    LEFT = MOUSE_BUTTON_LEFT,
+    RIGHT = MOUSE_BUTTON_RIGHT,
     MIDDLE = MOUSE_BUTTON_MIDDLE
   };
 
@@ -316,12 +294,11 @@ class MeshEdit : public Renderer {
   bool right_down;
   bool middle_down;
 
-  void mouseP(e_mouse_button b);// Mouse pressed.
-  void mouseR(e_mouse_button b);// Mouse Released.
-  void mouseD(float x, float y);// Mouse Dragged.
-  void mouseM(float x, float y);// Mouse Moved.
-  void updateMouseCoordinates(float x, float y);// updates stored mouse_x/y
-
+  void mouseP(e_mouse_button b);                 // Mouse pressed.
+  void mouseR(e_mouse_button b);                 // Mouse Released.
+  void mouseD(float x, float y);                 // Mouse Dragged.
+  void mouseM(float x, float y);                 // Mouse Moved.
+  void updateMouseCoordinates(float x, float y); // updates stored mouse_x/y
 
   // -- Feature Selection.
   MeshFeature hoveredFeature;  // feature currently under the cursor
@@ -338,35 +315,27 @@ class MeshEdit : public Renderer {
    *     screen_y_offset -- offset in screen space in y direction.
    * IN / OUT : position -- Position vector in world space.
    */
-  void dragPosition(float screen_x_offset,
-					float screen_y_offset,
-					Vector3D & position);
+  void dragPosition(float screen_x_offset, float screen_y_offset, Vector3D &position);
 
+  inline bool triangleSelectionTest(const Vector2D &selectionPoint, Vector4D &A,
+                                    Vector4D &B, Vector4D &C, float &w,
+                                    Vector3D &barycentricCoordinates);
 
-  inline bool triangleSelectionTest
-	(const Vector2D & selectionPoint,
-	 Vector4D & A, Vector4D & B, Vector4D & C,
-	 float & w,
-         Vector3D& barycentricCoordinates );
-
-  inline Vector2D unitCubeToScreenSpace(Vector4D & in);
-
-
+  inline Vector2D unitCubeToScreenSpace(Vector4D &in);
 
   // -- Geometric Operations
   // Local operations on current element.
-  void flipSelectedEdge( void );
-  void splitSelectedEdge( void );
+  void flipSelectedEdge(void);
+  void splitSelectedEdge(void);
   // Sets up and calls the MeshResampler with the appropiate operation.
   void mesh_up_sample();
 
   // If a halfedge is selected, advances to the next or twin halfedge.
-  void selectNextHalfedge( void );
-  void selectTwinHalfedge( void );
+  void selectNextHalfedge(void);
+  void selectTwinHalfedge(void);
 
   // The canonical resampler used to perform operations on meshes.
   MeshResampler resampler;
-
 
   // OSD text manager
   OSDText text_mgr;
@@ -377,8 +346,6 @@ class MeshEdit : public Renderer {
   bool showHUD;
   void drawHUD();
   inline void drawString(float x, float y, string str, size_t size, Color c);
-
-
 
 }; // class MeshEdit
 
