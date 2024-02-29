@@ -1,4 +1,5 @@
 #include "student_code.h"
+#include "CGL/vector3D.h"
 #include "halfEdgeMesh.h"
 #include "mutablePriorityQueue.h"
 
@@ -177,6 +178,18 @@ VertexIter HalfedgeMesh::splitEdge(EdgeIter e0) {
   return ha->vertex();
 }
 
+static pair<int, Vector3D> neighborCountSum(VertexIter v) {
+  Vector3D sum;
+  int n = 0;
+  HalfedgeCIter h = v->halfedge();
+  do {
+    n++;
+    sum += h->twin()->vertex()->position;
+    h = h->twin()->next();
+  } while (h != v->halfedge());
+  return make_pair(n, sum);
+}
+
 void MeshResampler::upsample(HalfedgeMesh &mesh) {
   // TODO Part 6.
   // This routine should increase the number of triangles in the mesh using Loop
@@ -190,20 +203,13 @@ void MeshResampler::upsample(HalfedgeMesh &mesh) {
   for (VertexIter v = mesh.verticesBegin(); v != mesh.verticesEnd(); ++v) {
     if (v->isBoundary()) {
       v->newPosition = v->position;
-    } else {
-      Vector3D neighborSum(0, 0, 0);
-      int n = 0;
-      HalfedgeCIter h = v->halfedge();
-      do {
-        n++;
-        neighborSum += h->twin()->vertex()->position;
-        h = h->twin()->next();
-      } while (h != v->halfedge());
-
-      double u = (n == 3) ? 3.0 / 16.0 : 3.0 / (8 * n);
-      v->newPosition = (1 - n * u) * v->position + u * neighborSum;
-      v->isNew = false;
+      continue;
     }
+
+    auto [n, neighborSum] = neighborCountSum(v);
+    double u = (n == 3) ? 3.0 / 16.0 : 3.0 / (8 * n);
+    v->newPosition = (1 - n * u) * v->position + u * neighborSum;
+    v->isNew = false;
   }
 
   // 2. Compute the updated vertex positions associated with edges, and store it in
@@ -262,4 +268,75 @@ void MeshResampler::upsample(HalfedgeMesh &mesh) {
     v->position = v->newPosition;
   }
 }
+
+VertexIter HalfedgeMesh::splitFace(FaceIter f0) {
+  HalfedgeIter h = f0->halfedge(), hN = h->next(), hNN = hN->next();
+
+  VertexIter mid = newVertex();
+  mid->position = h->vertex()->position + hN->vertex()->position + hNN->vertex()->position;
+  mid->position /= 3;
+
+  HalfedgeIter c = newHalfedge(), cT = newHalfedge();
+  HalfedgeIter b = newHalfedge(), bT = newHalfedge();
+  HalfedgeIter a = newHalfedge(), aT = newHalfedge();
+
+  a->setNeighbors(h, aT, mid, newEdge(), h->face());
+  b->setNeighbors(hN, bT, mid, newEdge(), newFace());
+  c->setNeighbors(hNN, cT, mid, newEdge(), newFace());
+
+  aT->setNeighbors(c, a, h->vertex(), a->edge(), c->face());
+  bT->setNeighbors(a, b, hN->vertex(), b->edge(), a->face());
+  cT->setNeighbors(b, c, hNN->vertex(), c->edge(), b->face());
+
+  h->setNeighbors(bT, h->twin(), h->vertex(), h->edge(), bT->face());
+  hN->setNeighbors(cT, hN->twin(), hN->vertex(), hN->edge(), cT->face());
+  hNN->setNeighbors(aT, hNN->twin(), hNN->vertex(), hNN->edge(), aT->face());
+
+  UPDATE_POINTERS_3(hNN, aT, c);
+  UPDATE_POINTERS_3(hN, cT, b);
+  UPDATE_POINTERS_3(h, bT, a);
+
+  return mid;
+}
+
+void MeshResampler::upsample_alt(HalfedgeMesh &mesh) {
+  // update old vertices
+  for (VertexIter v = mesh.verticesBegin(); v != mesh.verticesEnd(); ++v) {
+    auto [n, neighborSum] = neighborCountSum(v);
+    double alpha = (4 - 2 * cos(2 * M_PI / n)) / 9;
+    v->newPosition = (1 - alpha) * v->position + alpha * neighborSum / n;
+    UPDATE_POINTERS(v->halfedge());
+    UPDATE_POINTERS(v->halfedge()->twin());
+    cout << "face: " << v->halfedge()->face()->area() << endl;
+  }
+
+  vector<FaceIter> originalFaces;
+  for (FaceIter f = mesh.facesBegin(); f != mesh.facesEnd(); f++) {
+    originalFaces.push_back(f);
+  }
+
+  vector<EdgeIter> originalEdges;
+  for (EdgeIter e = mesh.edgesBegin(); e != mesh.edgesEnd(); e++) {
+    originalEdges.push_back(e);
+  }
+
+  cout << "originalFaces.size() = " << originalFaces.size() << endl;
+
+  // split every face into three and avg new positions
+  for (FaceIter f : originalFaces) {
+    VertexIter v = mesh.splitFace(f);
+    v->newPosition = v->position;
+  }
+
+  // flip every edge
+  for (EdgeIter e : originalEdges) {
+    mesh.flipEdge(e);
+  }
+
+  // Copy the new vertex positions into final Vertex::position.
+  for (VertexIter v = mesh.verticesBegin(); v != mesh.verticesEnd(); ++v) {
+    v->position = v->newPosition;
+  }
+}
+
 } // namespace CGL

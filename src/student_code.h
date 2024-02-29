@@ -17,6 +17,7 @@ namespace CGL {
     ~MeshResampler(){}
 
     void upsample(HalfedgeMesh& mesh);
+    void upsample_alt(HalfedgeMesh& mesh);
   };
 }
 

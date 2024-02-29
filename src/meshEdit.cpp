@@ -216,7 +216,12 @@ void MeshEdit::key_event(char key) {
 
   case 'l':
   case 'L':
-    mesh_up_sample();
+    mesh_up_sample(false);
+    break;
+
+  case ',':
+  case 'M':
+    mesh_up_sample(true);
     break;
 
   case 'i':
@@ -230,6 +235,7 @@ void MeshEdit::key_event(char key) {
   case 's':
   case 'S':
     splitSelectedEdge();
+    splitSelectedFace();
     break;
   case 'n':
   case 'N':
@@ -858,7 +864,7 @@ void MeshEdit::dragPosition(float screen_x_offset, float screen_y_offset,
 }
 
 // -- Geometric Operations
-void MeshEdit::mesh_up_sample() {
+void MeshEdit::mesh_up_sample(bool use_alt_scheme) {
   HalfedgeMesh *mesh;
 
   // If an element is selected, resample the mesh containing that
@@ -869,7 +875,10 @@ void MeshEdit::mesh_up_sample() {
     mesh = &(meshNodes.begin()->mesh);
   }
 
-  resampler.upsample(*mesh);
+  if (use_alt_scheme)
+    resampler.upsample_alt(*mesh);
+  else
+    resampler.upsample(*mesh);
 
   // Since the mesh may have changed, the selected and
   // hovered features may no longer point to valid elements.
@@ -1464,6 +1473,24 @@ void MeshEdit ::splitSelectedEdge(void) {
     return;
   }
   selectedFeature.node->mesh.splitEdge(e->halfedge()->edge());
+
+  // Since the mesh may have changed, the selected and
+  // hovered features may no longer point to valid elements.
+  selectedFeature.invalidate();
+  hoveredFeature.invalidate();
+}
+
+void MeshEdit ::splitSelectedFace(void) {
+  Face *e = NULL;
+  if (selectedFeature.isValid()) {
+    e = selectedFeature.element->getFace();
+  }
+
+  if (e == NULL) {
+    cerr << "Must select an edge." << endl;
+    return;
+  }
+  selectedFeature.node->mesh.splitFace(e->halfedge()->face());
 
   // Since the mesh may have changed, the selected and
   // hovered features may no longer point to valid elements.

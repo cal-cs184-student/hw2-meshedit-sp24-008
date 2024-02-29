@@ -327,8 +327,9 @@ private:
   // Local operations on current element.
   void flipSelectedEdge(void);
   void splitSelectedEdge(void);
+  void splitSelectedFace(void);
   // Sets up and calls the MeshResampler with the appropiate operation.
-  void mesh_up_sample();
+  void mesh_up_sample(bool use_alt_scheme = false);
 
   // If a halfedge is selected, advances to the next or twin halfedge.
   void selectNextHalfedge(void);
