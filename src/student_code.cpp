@@ -188,30 +188,42 @@ void MeshResampler::upsample(HalfedgeMesh &mesh) {
 
   // update old vertices
   for (VertexIter v = mesh.verticesBegin(); v != mesh.verticesEnd(); ++v) {
-    Vector3D neighborSum(0, 0, 0);
-    int n = 0;
-    HalfedgeCIter h = v->halfedge();
-    do {
-      n++;
-      neighborSum += h->twin()->vertex()->position;
-      h = h->twin()->next();
-    } while (h != v->halfedge());
+    if (v->isBoundary()) {
+      v->newPosition = v->position;
+    } else {
+      Vector3D neighborSum(0, 0, 0);
+      int n = 0;
+      HalfedgeCIter h = v->halfedge();
+      do {
+        n++;
+        neighborSum += h->twin()->vertex()->position;
+        h = h->twin()->next();
+      } while (h != v->halfedge());
 
-    double u = (n == 3) ? 3.0 / 16.0 : 3.0 / (8 * n);
-    v->newPosition = (1 - n * u) * v->position + u * neighborSum;
-    v->isNew = false;
+      double u = (n == 3) ? 3.0 / 16.0 : 3.0 / (8 * n);
+      v->newPosition = (1 - n * u) * v->position + u * neighborSum;
+      v->isNew = false;
+    }
   }
 
   // 2. Compute the updated vertex positions associated with edges, and store it in
   // Edge::newPosition.
 
   for (EdgeIter e = mesh.edgesBegin(); e != mesh.edgesEnd(); ++e) {
-    HalfedgeIter h = e->halfedge();
-    Vector3D A = h->vertex()->position;
-    Vector3D B = h->twin()->vertex()->position;
-    Vector3D C = h->next()->next()->vertex()->position;
-    Vector3D D = h->twin()->next()->next()->vertex()->position;
-    e->newPosition = 3.0 / 8.0 * (A + B) + 1.0 / 8.0 * (C + D);
+    if (e->isBoundary()) {
+      HalfedgeIter h = e->halfedge();
+      Vector3D pos1 = h->vertex()->position;
+      Vector3D pos2 = h->twin()->vertex()->position;
+      Vector3D midpoint = (pos1 + pos2) * 0.5;
+      e->newPosition = midpoint;
+    } else {
+      HalfedgeIter h = e->halfedge();
+      Vector3D A = h->vertex()->position;
+      Vector3D B = h->twin()->vertex()->position;
+      Vector3D C = h->next()->next()->vertex()->position;
+      Vector3D D = h->twin()->next()->next()->vertex()->position;
+      e->newPosition = 3.0 / 8.0 * (A + B) + 1.0 / 8.0 * (C + D);
+    }
   }
 
   // 3. Split every edge in the mesh, in any order. For future reference, we're also
