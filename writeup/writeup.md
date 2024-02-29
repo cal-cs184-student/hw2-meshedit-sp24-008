@@ -135,8 +135,10 @@ slightly pointy pillow-like cuboid (left). If we first manually preprocess the
 cube and regularize vertex degrees by flipping edges, then we can obtain a
 rounder shape.
 
-EC: We also implemented boundary checks such that boundary edges are preserved
-and not moved or smoothed. See beetle below. Boundary vertices do not move, and
+### Extra Credit: Boundary support
+
+We also implemented boundary checks such that boundary edges are preserved and
+not moved or smoothed. See beetle below. Boundary vertices do not move, and
 boundary edges are split in the middle instead of using the Loop formula.
 
 | Cube                          | Preprocessed cube          | Beetle boundary case          |
@@ -147,3 +149,46 @@ boundary edges are split in the middle instead of using the Loop formula.
 | ![](images/task6-pillow4.png) | ![](images/task6-reg4.png) | ![](images/task6-beetle4.png) |
 | ![](images/task6-pillow5.png) | ![](images/task6-reg5.png) |                               |
 | ![](images/task6-pillow6.png) | ![](images/task6-reg6.png) |                               |
+
+### Extra Credit: $\sqrt{3}$ subdivision
+
+We also implemented the $\sqrt{3}$ subdivision scheme. The main difference is
+that each triangle get split into three new triangles, instead of four, so there
+is a different splitting and smoothing formula.
+
+First, we had to implement "face splitting". Instead of splitting an edge,
+forming two new edges, we can split a face, forming three new edges, by adding a
+new vertex at the midpoint of the face. Then, we can draw edges to the existing
+vertices of the triangle. See this example below:
+
+![Face split](images/task6-ec-split-face.png)
+
+After splitting every face, we're now left with some irregularly shaped
+triangles — the next step is to flip each original edge so that the triangles
+are regular-sized again. This leaves us with three times the number of old
+triangles, but slightly finer grained.
+
+Lastly, we had to implement the $\sqrt{3}$ smoothing formula. The new vertices
+are already placed at the averages of the neighboring vertices, so we just had
+to adjust the old vertices. This is accomplished using the formula
+
+$$
+\alpha_n = \frac{4 - 2 \cos(2 \pi / n)}{9} \\
+S(p) = (1 - \alpha_n) p + \alpha_n \frac{1}{n} \sum_{i=0}^{n-1} p_i
+$$
+
+where $p$ is the old vertex, $p_i$ are the neighboring vertices, and $n$ is the
+degree of the vertex. We implemented this in C++ and applied it to the vertices.
+
+Now, we had a working $\sqrt{3}$ subdivision scheme! In our program, you can
+press `L` to use the Loop subdivision, or press `M` to use the $\sqrt{3}$
+subdivision. Here are some comparisons between the existing Loop subdivision
+scheme and the new $\sqrt{3}$ scheme:
+
+![](images/task6-ec-icosahedron.png)
+
+![](images/task6-ec-teapot.png)
+
+The Loop subdivision scheme is on the left, and the $\sqrt{3}$ scheme is on the
+right. The $\sqrt{3}$ scheme produces less triangles, so it might be more
+desirable for complex models.
