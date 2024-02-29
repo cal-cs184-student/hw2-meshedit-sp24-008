@@ -118,7 +118,7 @@ public:
   MeshNode(Polymesh &polyMesh) {
 
     // Construct a new array of index lists for the halfedgemesh structure.
-    vector<vector<size_t>> polygons;
+    vector<vector<size_t> > polygons;
 
     // Currently, the halfedge data structure only stores the connectivity of
     // the mesh and the vertex positions; here we just want to copy the
